@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход — Video Bot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="card">
+    <h1>Video Bot</h1>
+    <div class="subtitle">Введи пароль, чтобы попасть в панель сборки роликов</div>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post">
+      <label>Пароль</label>
+      <input type="password" name="password" autofocus required>
+      <button type="submit">Войти</button>
+    </form>
+  </div>
+</body>
+</html>

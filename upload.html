@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Новый ролик — Video Bot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="card">
+    <h1>Новый ролик</h1>
+    <div class="subtitle">Загрузи файл сцен (200 промптов + текст) и цельную озвучку</div>
+
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <form method="post" action="{{ url_for('submit') }}" enctype="multipart/form-data">
+      <label>Название (для истории, необязательно)</label>
+      <input type="text" name="label" placeholder="5 финансовых ошибок #14">
+
+      <label>Файл сцен (.csv или .json)</label>
+      <input type="file" name="scenes_file" accept=".csv,.json,.tsv" required>
+
+      <label>Озвучка (весь ролик одним файлом)</label>
+      <input type="file" name="audio_file" accept="audio/*" required>
+
+      <button type="submit">Собрать видео</button>
+    </form>
+  </div>
+
+  {% if recent %}
+  <div class="card recent">
+    <h2>Последние ролики</h2>
+    {% for job in recent %}
+      <div class="recent-item">
+        <a href="{{ url_for('job_status', job_id=job.id) }}">{{ job.label }}</a>
+        <span class="badge {{ job.status }}">{{ job.status }}</span>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="logout"><a href="{{ url_for('logout') }}">Выйти</a></div>
+</body>
+</html>

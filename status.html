@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ job.label }} — Video Bot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="card">
+    <h1>{{ job.label }}</h1>
+    <div class="subtitle" id="status-line">{{ job.message }}</div>
+
+    <div class="percent" id="percent">{{ job.percent }}%</div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="bar" style="width: {{ job.percent }}%;"></div>
+    </div>
+    <div class="status-msg" id="msg">{{ job.message }}</div>
+
+    <div id="download-wrap" style="{{ 'display:none;' if job.status != 'done' }}">
+      <a class="btn" href="{{ url_for('download', job_id=job.id) }}">Скачать видео</a>
+    </div>
+    <a class="btn" href="{{ url_for('index') }}" style="background:#2a2f3a; margin-top:12px;">К списку роликов</a>
+  </div>
+
+  <script>
+    const jobId = "{{ job.id }}";
+    const done = {{ 'true' if job.status in ('done','error') else 'false' }};
+
+    function poll() {
+      fetch(`/api/job/${jobId}`)
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('percent').textContent = data.percent + '%';
+          document.getElementById('bar').style.width = data.percent + '%';
+          document.getElementById('msg').textContent = data.message;
+          document.getElementById('status-line').textContent = data.message;
+
+          if (data.status === 'done') {
+            document.getElementById('download-wrap').style.display = 'block';
+          } else if (data.status === 'error') {
+            document.getElementById('bar').style.background = '#ff5a6a';
+          } else {
+            setTimeout(poll, 2000);
+          }
+        })
+        .catch(() => setTimeout(poll, 3000));
+    }
+
+    if (!done) {
+      setTimeout(poll, 2000);
+    }
+  </script>
+</body>
+</html>
