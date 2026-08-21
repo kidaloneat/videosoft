@@ -7,7 +7,8 @@ import os
 # ---- Atlas Cloud ----
 ATLASCLOUD_API_KEY = os.environ.get("ATLASCLOUD_API_KEY", "")
 ATLAS_BASE_URL = "https://api.atlascloud.ai/api/v1/model"
-ATLAS_MODEL = "openai/gpt-image-2/text-to-image"
+ATLAS_MODEL = "openai/gpt-image-2/text-to-image"     # используется, если референсных картинок нет
+ATLAS_EDIT_MODEL = "openai/gpt-image-2/edit"          # используется, если заданы референсы (персонаж/стиль)
 ATLAS_IMAGE_SIZE = "1536x1024"     # 16:9-ish landшафт под GPT Image 2 (допустимые: 1024x1024, 1536x1024, 1024x1536 и т.д.)
 ATLAS_QUALITY = "medium"           # low | medium | high
 ATLAS_OUTPUT_FORMAT = "jpeg"
@@ -15,6 +16,7 @@ ATLAS_CONCURRENCY = 5              # сколько картинок генер�
 ATLAS_MAX_RETRIES = 3
 ATLAS_POLL_INTERVAL_SEC = 2
 ATLAS_POLL_TIMEOUT_SEC = 180
+ATLAS_MAX_REFERENCE_IMAGES = 10    # ограничение самого API
 
 # ---- Видео ----
 OUTPUT_WIDTH = 1920

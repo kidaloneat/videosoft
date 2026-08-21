@@ -14,10 +14,10 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from config import (
-    ATLASCLOUD_API_KEY, ATLAS_BASE_URL, ATLAS_MODEL,
+    ATLASCLOUD_API_KEY, ATLAS_BASE_URL, ATLAS_MODEL, ATLAS_EDIT_MODEL,
     ATLAS_IMAGE_SIZE, ATLAS_QUALITY, ATLAS_OUTPUT_FORMAT,
     ATLAS_CONCURRENCY, ATLAS_MAX_RETRIES,
-    ATLAS_POLL_INTERVAL_SEC, ATLAS_POLL_TIMEOUT_SEC,
+    ATLAS_POLL_INTERVAL_SEC, ATLAS_POLL_TIMEOUT_SEC, ATLAS_MAX_REFERENCE_IMAGES,
 )
 
 
@@ -37,14 +37,24 @@ def _headers():
     }
 
 
-def _submit(prompt: str) -> str:
-    payload = {
-        "model": ATLAS_MODEL,
-        "prompt": prompt,
-        "size": ATLAS_IMAGE_SIZE,
-        "quality": ATLAS_QUALITY,
-        "output_format": ATLAS_OUTPUT_FORMAT,
-    }
+def _submit(prompt: str, reference_urls: list[str] | None = None) -> str:
+    if reference_urls:
+        payload = {
+            "model": ATLAS_EDIT_MODEL,
+            "prompt": prompt,
+            "images": reference_urls,
+            "size": ATLAS_IMAGE_SIZE,
+            "quality": ATLAS_QUALITY,
+            "output_format": ATLAS_OUTPUT_FORMAT,
+        }
+    else:
+        payload = {
+            "model": ATLAS_MODEL,
+            "prompt": prompt,
+            "size": ATLAS_IMAGE_SIZE,
+            "quality": ATLAS_QUALITY,
+            "output_format": ATLAS_OUTPUT_FORMAT,
+        }
     resp = requests.post(
         f"{ATLAS_BASE_URL}/generateImage",
         headers=_headers(), json=payload, timeout=30,
@@ -91,12 +101,50 @@ def _download(url: str, out_path: str):
         f.write(resp.content)
 
 
-def generate_image(prompt: str, out_path: str):
+def upload_reference_image(path: str) -> str:
+    """Загружает одну картинку в Atlas Cloud storage, возвращает временный URL."""
+    with open(path, "rb") as f:
+        resp = requests.post(
+            f"{ATLAS_BASE_URL}/uploadMedia",
+            headers={"Authorization": f"Bearer {ATLASCLOUD_API_KEY}"},
+            files={"file": f},
+            timeout=60,
+        )
+    resp.raise_for_status()
+    data = resp.json()
+    url = data.get("url") or data.get("data", {}).get("url")
+    if not url:
+        raise AtlasError(f"Не получил URL загруженного файла: {data}")
+    return url
+
+
+def upload_reference_images(paths: list[str]) -> list[str]:
+    """
+    Загружает референсные картинки (персонаж + стиль) один раз в начале —
+    дальше их URL переиспользуется для всех 200 сцен, повторно заливать
+    не нужно.
+    """
+    if not paths:
+        return []
+    if len(paths) > ATLAS_MAX_REFERENCE_IMAGES:
+        raise AtlasError(
+            f"Слишком много референсных картинок ({len(paths)}) — "
+            f"Atlas Cloud принимает максимум {ATLAS_MAX_REFERENCE_IMAGES} за один запрос."
+        )
+    urls = []
+    for path in paths:
+        url = upload_reference_image(path)
+        urls.append(url)
+        print(f"  референс загружен: {os.path.basename(path)}")
+    return urls
+
+
+def generate_image(prompt: str, out_path: str, reference_urls: list[str] | None = None):
     """Генерирует одну картинку с ретраями, сохраняет в out_path."""
     last_err = None
     for attempt in range(1, ATLAS_MAX_RETRIES + 1):
         try:
-            pred_id = _submit(prompt)
+            pred_id = _submit(prompt, reference_urls=reference_urls)
             url = _poll(pred_id)
             _download(url, out_path)
             return out_path
@@ -108,7 +156,7 @@ def generate_image(prompt: str, out_path: str):
     raise AtlasError(f"Не удалось сгенерировать картинку после {ATLAS_MAX_RETRIES} попыток: {last_err}")
 
 
-def generate_all_images(scenes: list[dict], images_dir: str, progress_cb=None) -> dict[int, str]:
+def generate_all_images(scenes: list[dict], images_dir: str, reference_urls: list[str] | None = None, progress_cb=None) -> dict[int, str]:
     """
     Генерирует картинки для всех сцен параллельно (с ограничением конкурентности).
     Пропускает сцены, для которых файл уже существует — так можно перезапускать
@@ -144,7 +192,7 @@ def generate_all_images(scenes: list[dict], images_dir: str, progress_cb=None) -
 
     with ThreadPoolExecutor(max_workers=ATLAS_CONCURRENCY) as pool:
         futures = {
-            pool.submit(generate_image, scene["prompt"], out_path): scene["scene"]
+            pool.submit(generate_image, scene["prompt"], out_path, reference_urls): scene["scene"]
             for scene, out_path in todo
         }
         done_count = already_done

@@ -107,6 +107,19 @@ def submit():
     audio_path = os.path.join(uploads_dir, f"audio{audio_ext}")
     audio_file.save(audio_path)
 
+    reference_paths = []
+    ref_files = request.files.getlist("reference_images")
+    if ref_files:
+        refs_dir = os.path.join(uploads_dir, "references")
+        os.makedirs(refs_dir, exist_ok=True)
+        for i, ref_file in enumerate(ref_files, start=1):
+            if not ref_file or ref_file.filename == "":
+                continue
+            ext = os.path.splitext(secure_filename(ref_file.filename))[1].lower() or ".jpg"
+            ref_path = os.path.join(refs_dir, f"ref_{i:02d}{ext}")
+            ref_file.save(ref_path)
+            reference_paths.append(ref_path)
+
     label = request.form.get("label", "").strip() or scenes_file.filename
 
     with JOBS_LOCK:
@@ -121,13 +134,17 @@ def submit():
             "created_at": time.time(),
         }
 
-    thread = threading.Thread(target=_run_job, args=(job_id, scenes_path, audio_path, job_dir), daemon=True)
+    thread = threading.Thread(
+        target=_run_job,
+        args=(job_id, scenes_path, audio_path, job_dir, reference_paths),
+        daemon=True,
+    )
     thread.start()
 
     return redirect(url_for("job_status", job_id=job_id))
 
 
-def _run_job(job_id, scenes_path, audio_path, job_dir):
+def _run_job(job_id, scenes_path, audio_path, job_dir, reference_paths=None):
     def progress_cb(stage, percent, message):
         with JOBS_LOCK:
             if job_id in JOBS:
@@ -136,7 +153,10 @@ def _run_job(job_id, scenes_path, audio_path, job_dir):
                 JOBS[job_id]["message"] = message
 
     try:
-        final_path = run_pipeline(scenes_path, audio_path, job_dir, progress_cb=progress_cb)
+        final_path = run_pipeline(
+            scenes_path, audio_path, job_dir,
+            reference_paths=reference_paths, progress_cb=progress_cb,
+        )
         with JOBS_LOCK:
             JOBS[job_id]["status"] = "done"
             JOBS[job_id]["percent"] = 100

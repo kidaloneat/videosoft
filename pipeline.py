@@ -6,18 +6,24 @@
 import os
 
 from scenes_loader import load_scenes
-from atlas_client import generate_all_images
+from atlas_client import generate_all_images, upload_reference_images
 from timing import get_audio_duration_sec, compute_scene_durations
 from subtitles import build_ass_subtitles
 from render import render_scene_clip, concat_clips, burn_subtitles, mux_audio
 
 
-def run_pipeline(scenes_path: str, audio_path: str, job_dir: str, progress_cb=None) -> str:
+def run_pipeline(scenes_path: str, audio_path: str, job_dir: str, reference_paths=None, progress_cb=None) -> str:
     """
     scenes_path — путь к файлу сцен (.csv/.json)
     audio_path  — путь к цельному аудиофайлу озвучки
     job_dir     — рабочая папка для этого прогона (картинки/клипы/результат
                   складываются внутри неё в подпапки)
+    reference_paths — необязательный список путей к референсным картинкам
+                  (персонаж + примеры стиля). Если задан, каждая сцена
+                  генерируется через режим Edit (openai/gpt-image-2/edit):
+                  модель рисует новую сцену, ориентируясь на внешний вид
+                  персонажа и стиль с этих референсов, а не с нуля по
+                  одному только тексту.
     progress_cb(stage: str, percent: float, message: str) — необязательный
         коллбэк для отображения прогресса (используется веб-интерфейсом)
 
@@ -40,12 +46,17 @@ def run_pipeline(scenes_path: str, audio_path: str, job_dir: str, progress_cb=No
     n = len(scenes)
     report("parse", 2, f"Сцен загружено: {n}")
 
+    reference_urls = None
+    if reference_paths:
+        report("references", 3, f"Загружаю референсные картинки ({len(reference_paths)})")
+        reference_urls = upload_reference_images(reference_paths)
+
     def img_progress(done, total):
-        pct = 2 + (done / total) * 53
+        pct = 5 + (done / total) * 50
         report("images", pct, f"Картинки через Atlas Cloud: {done}/{total}")
 
-    report("images", 2, "Генерирую картинки через Atlas Cloud (GPT Image 2)")
-    image_paths = generate_all_images(scenes, images_dir, progress_cb=img_progress)
+    report("images", 5, "Генерирую картинки через Atlas Cloud (GPT Image 2)")
+    image_paths = generate_all_images(scenes, images_dir, reference_urls=reference_urls, progress_cb=img_progress)
 
     report("timing", 56, "Считаю длину аудио и распределяю тайминг по сценам")
     total_audio = get_audio_duration_sec(audio_path)

@@ -20,12 +20,14 @@ def main():
     parser = argparse.ArgumentParser(description="Собрать видео из сцен + озвучки")
     parser.add_argument("--scenes", required=True, help="путь к файлу сцен (.csv или .json)")
     parser.add_argument("--audio", required=True, help="путь к аудиофайлу озвучки (весь ролик целиком)")
+    parser.add_argument("--reference", action="append", default=None,
+                         help="путь к референсной картинке (персонаж/стиль); можно указать флаг несколько раз")
     parser.add_argument("--job-dir", default=os.path.join(WORKDIR, "jobs", "cli"),
                          help="рабочая папка (по умолчанию jobs/cli)")
     args = parser.parse_args()
 
     t0 = time.time()
-    final_path = run_pipeline(args.scenes, args.audio, args.job_dir)
+    final_path = run_pipeline(args.scenes, args.audio, args.job_dir, reference_paths=args.reference)
     elapsed = time.time() - t0
     print(f"\nГОТОВО за {elapsed/60:.1f} мин: {final_path}")
 
