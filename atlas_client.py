@@ -112,7 +112,8 @@ def upload_reference_image(path: str) -> str:
         )
     resp.raise_for_status()
     data = resp.json()
-    url = data.get("url") or data.get("data", {}).get("url")
+    payload = data.get("data", data)
+    url = payload.get("download_url") or payload.get("url")
     if not url:
         raise AtlasError(f"Не получил URL загруженного файла: {data}")
     return url

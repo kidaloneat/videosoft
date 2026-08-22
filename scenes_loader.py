@@ -44,6 +44,21 @@ def load_scenes(path: str) -> list[dict]:
     if ext == ".json":
         with open(path, "r", encoding="utf-8") as f:
             raw_rows = json.load(f)
+        # Поддержка разных форм JSON:
+        #   [{"scene":1,...}, {"scene":2,...}]                — список (основной формат)
+        #   {"scenes": [{"scene":1,...}, ...]}                — обёрнуто в поле "scenes"
+        #   {"1": {"prompt":...,"text":...}, "2": {...}}      — объект, ключ = номер сцены
+        if isinstance(raw_rows, dict):
+            if "scenes" in raw_rows and isinstance(raw_rows["scenes"], list):
+                raw_rows = raw_rows["scenes"]
+            else:
+                converted = []
+                for key, value in raw_rows.items():
+                    if isinstance(value, dict):
+                        value = dict(value)
+                        value.setdefault("scene", key)
+                        converted.append(value)
+                raw_rows = converted
     elif ext in (".csv", ".tsv"):
         delimiter = "\t" if ext == ".tsv" else ","
         with open(path, "r", encoding="utf-8-sig", newline="") as f:

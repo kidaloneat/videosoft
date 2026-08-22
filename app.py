@@ -202,4 +202,4 @@ if __name__ == "__main__":
         print("!! ВНИМАНИЕ: пароль по умолчанию не изменён (APP_PASSWORD=change-me).")
         print("!! Установи свой пароль перед тем как выставлять сервер наружу:")
         print("!!   export APP_PASSWORD=свой_пароль")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), threaded=True)
